@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+dist
+.wrangler
+.sites-runtime
+.openai
+.env*
+work
+outputs
+examples
+*.tsbuildinfo
