@@ -8,6 +8,7 @@
 .navigation{overflow-y:hidden!important;scrollbar-width:thin;min-height:59px}.navigation [data-slot=tabs-trigger]{flex-shrink:0} .setup h1{font-size:23px}
 
 /* Account controls and task directions stay reachable on small touchscreens. */
+.task-share-actions{justify-content:flex-end;padding:4px 8px;gap:22px}.task-share-actions .link-button{min-height:44px}.task-share-actions .task-delete{margin:0}.invite-share input{font-size:14px;overflow:hidden;text-overflow:ellipsis}.invite-share .actions .button{min-height:44px}.invite-share label{overflow-wrap:anywhere}details>summary{cursor:pointer;margin:12px 0}
 .role-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 0 0}
 .role-bar strong{font-size:15px}.role-bar p{margin-top:4px;font-size:13px}
 .role-buttons{display:flex;gap:8px;flex-shrink:0}.logout-button{white-space:nowrap;min-height:44px}

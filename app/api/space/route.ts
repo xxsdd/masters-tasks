@@ -5,7 +5,7 @@ import {boardFor} from '@/app/boards';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 class PublicError extends Error{}
-export async function GET(){try{const user=await getUser();if(!user)return reply({user:null,room:null});const room=await roomFor(user.userId);const board=room?boardFor(room,user.userId):null;return reply({user:{id:user.userId,name:user.displayName,username:user.username},room:room&&board?{id:room.id,role:board.role,board:board.column,paired:!!room.partner,code:room.owner===user.userId?room.code:null,state:board.state}:null});}catch(e:any){console.error('space load',e.code||e.name);return reply({error:'暂时无法加载空间，请稍后重试'},503)}}
+export async function GET(){try{const user=await getUser();if(!user)return reply({user:null,room:null});const room=await roomFor(user.userId);const board=room?boardFor(room,user.userId):null;return reply({user:{id:user.userId,name:user.displayName,username:user.username},room:room&&board?{id:room.id,role:board.role,board:board.column,paired:!!room.partner,code:room.code,state:board.state}:null});}catch(e:any){console.error('space load',e.code||e.name);return reply({error:'暂时无法加载空间，请稍后重试'},503)}}
 export async function POST(req:Request){
  if(!sameOrigin(req))return reply({error:'请求来源无效'},403);
  try{
@@ -23,13 +23,23 @@ export async function POST(req:Request){
     await db.query('INSERT INTO members(user_id,room_id) VALUES($1,$2)',[user.userId,id]);return {message:'双人空间已创建'};
    }
    if(b.action==='joinRoom'){
-    if(room)throw new PublicError('你已加入一个空间，不能重复加入');
     const code=String(b.code||'').trim();if(!/^[a-f0-9]{32}$/.test(code))throw new PublicError('邀请码格式不正确');
-    const {rows}=await db.query('SELECT id,owner,partner FROM rooms WHERE code=$1 FOR UPDATE',[code]);const target=rows[0];
-    if(!target||target.partner)throw new PublicError('邀请码无效，或这个空间已经配对');
-    if(target.owner===user.userId)throw new PublicError('请让小伙伴用自己的账号加入');
-    await db.query('UPDATE rooms SET partner=$1,version=version+1 WHERE id=$2',[user.userId,target.id]);
-    await db.query('INSERT INTO members(user_id,room_id) VALUES($1,$2)',[user.userId,target.id]);return {message:'配对成功，欢迎来到我们的空间'};
+    if(room&&room.code!==code)throw new PublicError('当前账号已加入另一个空间，请换用受邀的账号登录');
+    const column=b.inviteBoard||'state';
+    if(!['state','reverse_state'].includes(column))throw new PublicError('任务链接无效');
+    const {rows}=room?{rows:[room]}:await db.query('SELECT * FROM rooms WHERE code=$1 FOR UPDATE',[code]);const target=rows[0];
+    if(!target)throw new PublicError('邀请链接无效，请让对方重新分享');
+    if(!room){
+     if(target.partner)throw new PublicError('这个空间已经配对，请使用原来的伙伴账号登录');
+     await db.query('UPDATE rooms SET partner=$1,version=version+1 WHERE id=$2',[user.userId,target.id]);
+     await db.query('INSERT INTO members(user_id,room_id) VALUES($1,$2)',[user.userId,target.id]);
+     target.partner=user.userId;
+    }
+    const role=(target.owner===user.userId)===(column==='state')?'owner':'partner';
+    await db.query('UPDATE members SET mode=$1 WHERE user_id=$2',[role,user.userId]);
+    const state=boardFor({...target,mode:role},user.userId).state;
+    const task=state.tasks.find(t=>t.id===b.taskId&&!t.deletedAt);
+    return {message:room?'已打开任务空间':'配对成功，欢迎来到我们的空间',taskId:task?.id,taskUnavailable:!!b.taskId&&!task};
    }
    if(!room)throw new PublicError('请先创建或加入空间');
    if(!/^[0-9a-f-]{36}$/i.test(b.requestId||''))throw new PublicError('请求编号无效，请刷新后重试');
