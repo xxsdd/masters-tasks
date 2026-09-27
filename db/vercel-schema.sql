@@ -22,3 +22,16 @@ CREATE TABLE IF NOT EXISTS uploads (
 CREATE TABLE IF NOT EXISTS operations (
  id text PRIMARY KEY, room_id text NOT NULL REFERENCES rooms(id), user_id text NOT NULL REFERENCES users(id), result text NOT NULL
 );
+
+-- Additive migrations: existing accounts and original task boards are preserved.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(lower(email)) WHERE email IS NOT NULL;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS reverse_state text;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS mode text CHECK (mode IN ('owner','partner'));
+CREATE TABLE IF NOT EXISTS email_challenges (
+ id text PRIMARY KEY, purpose text NOT NULL, user_id text REFERENCES users(id) ON DELETE CASCADE,
+ email text NOT NULL, code_hash text NOT NULL, payload jsonb NOT NULL DEFAULT '{}',
+ attempts integer NOT NULL DEFAULT 0, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS email_challenges_user ON email_challenges(user_id);

@@ -1,10 +1,11 @@
 import {getUser,sameOrigin} from '@/app/auth';
 import {database,roomFor,transaction} from '@/db/store';
 import {initialState,mutate} from '@/app/domain';
+import {boardFor} from '@/app/boards';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 class PublicError extends Error{}
-export async function GET(){try{const user=await getUser();if(!user)return reply({user:null,room:null});const room=await roomFor(user.userId);return reply({user:{id:user.userId,name:user.displayName,email:user.email},room:room?{id:room.id,role:room.owner===user.userId?'owner':'partner',paired:!!room.partner,code:room.owner===user.userId?room.code:null,state:JSON.parse(room.state)}:null});}catch(e:any){console.error('space load',e.code||e.name);return reply({error:'暂时无法加载空间，请稍后重试'},503)}}
+export async function GET(){try{const user=await getUser();if(!user)return reply({user:null,room:null});const room=await roomFor(user.userId);const board=room?boardFor(room,user.userId):null;return reply({user:{id:user.userId,name:user.displayName,username:user.username,email:user.email,emailVerified:user.emailVerified},room:room&&board?{id:room.id,role:board.role,board:board.column,paired:!!room.partner,code:room.owner===user.userId?room.code:null,state:board.state}:null});}catch(e:any){console.error('space load',e.code||e.name);return reply({error:'暂时无法加载空间，请稍后重试'},503)}}
 export async function POST(req:Request){
  if(!sameOrigin(req))return reply({error:'请求来源无效'},403);
  try{
@@ -34,13 +35,22 @@ export async function POST(req:Request){
    if(!/^[0-9a-f-]{36}$/i.test(b.requestId||''))throw new PublicError('请求编号无效，请刷新后重试');
    const {rows:existing}=await db.query('SELECT result FROM operations WHERE id=$1 AND room_id=$2 AND user_id=$3',[b.requestId,room.id,user.userId]);
    if(existing[0])return JSON.parse(existing[0].result);
+   if(b.action==='switchRole'){
+    if(!['owner','partner'].includes(b.role))throw new PublicError('请选择有效身份');
+    await db.query('UPDATE members SET mode=$1 WHERE user_id=$2',[b.role,user.userId]);
+    const result={message:b.role==='owner'?'已切换到我发布的任务':'已切换到我接到的任务'};
+    await db.query('INSERT INTO operations(id,room_id,user_id,result) VALUES($1,$2,$3,$4)',[b.requestId,room.id,user.userId,JSON.stringify(result)]);
+    return result;
+   }
+   const board=boardFor(room,user.userId);
+   if(b.board!==board.column)throw new PublicError('身份已在其他页面切换，请刷新后重试');
    if(b.action==='submit'){
     b.files=Array.isArray(b.files)?b.files:[];if(b.files.length>3)throw new PublicError('最多上传三个文件');
     const safe=[];for(const f of b.files){const {rows}=await db.query('SELECT id,name,type FROM uploads WHERE id=$1 AND room_id=$2 AND user_id=$3',[String(f.id),room.id,user.userId]);if(!rows[0])throw new PublicError('凭证文件不存在或无权使用');safe.push(rows[0]);}b.files=safe;
    }
-   let changed;try{changed=mutate(JSON.parse(room.state),room.owner===user.userId?'owner':'partner',b.action,b,undefined,()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296)}catch(e:any){throw new PublicError(e.message)}
+   let changed;try{changed=mutate(board.state,board.role,b.action,b,undefined,()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296)}catch(e:any){throw new PublicError(e.message)}
    const serialized=JSON.stringify(changed.state);if(serialized.length>700000)throw new PublicError('空间记录已达到容量上限');
-   await db.query('UPDATE rooms SET state=$1,version=version+1 WHERE id=$2',[serialized,room.id]);
+   await db.query(`UPDATE rooms SET ${board.column}=$1,version=version+1 WHERE id=$2`,[serialized,room.id]);
    await db.query('INSERT INTO operations(id,room_id,user_id,result) VALUES($1,$2,$3,$4)',[b.requestId,room.id,user.userId,JSON.stringify(changed.result)]);
    return changed.result;
   });return reply(result);

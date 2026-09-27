@@ -7,7 +7,7 @@ export function database() {
 }
 export async function roomFor(userId: string, client?: PoolClient, lock = false) {
   const db = client || database();
-  const result = await db.query('SELECT r.* FROM rooms r JOIN members m ON r.id=m.room_id WHERE m.user_id=$1' + (lock ? ' FOR UPDATE OF r' : ''), [userId]);
+  const result = await db.query('SELECT r.*,m.mode FROM rooms r JOIN members m ON r.id=m.room_id WHERE m.user_id=$1' + (lock ? ' FOR UPDATE OF r' : ''), [userId]);
   return result.rows[0] || null;
 }
 export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {

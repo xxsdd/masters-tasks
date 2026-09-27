@@ -1,6 +1,6 @@
 export type Attachment={id:string;name:string;type:string};
 export type Submission={note:string;link:string;files:Attachment[];at:string;review?:string};
-export type Task={id:string;title:string;criteria:string;category:string;points:number;due:string;repeat:string;proof:string;status:string;created:string;submitted?:string;approved?:string;history:Submission[];feedback:string};
+export type Task={id:string;title:string;criteria:string;category:string;points:number;due:string;repeat:string;proof:string;status:string;created:string;submitted?:string;approved?:string;deletedAt?:string;history:Submission[];feedback:string};
 export type Reward={id:string;title:string;description:string;emoji:string;cost:number;stock:number;weight:number;active:boolean};
 export type RecordItem={id:string;title:string;kind:string;at:string;delta:number;fulfilled:boolean;rewardId?:string};
 export type State={ownerName:string;partnerName:string;points:number;earned:number;drawCost:number;blankWeight:number;tasks:Task[];rewards:Reward[];records:RecordItem[]};
@@ -23,7 +23,8 @@ export function mutate(state:State,role:'owner'|'partner',action:string,p:any,no
 const s=structuredClone(state);let message='已保存';let prize:string|undefined;const owner=()=>requireCondition(role==='owner','只有发布者可以执行此操作');const partner=()=>requireCondition(role==='partner','只有接任务的人可以执行此操作');
 const record=(title:string,kind:string,delta:number,rewardId?:string)=>s.records.unshift({id:crypto.randomUUID(),title,kind,delta,at:now,fulfilled:kind==='approve'||!rewardId,rewardId});
 if(action==='createTask'){owner();const title=txt(p.title,80),criteria=txt(p.criteria,2000);requireCondition(title&&criteria,'请填写任务名称和验收标准');requireCondition(s.tasks.length<1000,'任务数量已达到当前空间上限');const proof=['text','file','none'].includes(p.proof)?p.proof:'text';let due=txt(p.due,40);requireCondition(!due||Number.isFinite(Date.parse(due)),'截止时间无效');if(due)due=new Date(due).toISOString();s.tasks.unshift({id:crypto.randomUUID(),title,criteria,category:CATEGORY[p.category]?p.category:'生活',points:integer(p.points,1,10000),due,repeat:['daily','weekly'].includes(p.repeat)?p.repeat:'none',proof,status:'pending',created:now,history:[],feedback:''});message='任务发布啦，等待小伙伴接受';}
-else if(['accept','decline','submit','approve','revision','cancel'].includes(action)){const t=s.tasks.find(t=>t.id===p.id);requireCondition(t,'任务不存在');
+else if(['accept','decline','submit','approve','revision','cancel','deleteTask'].includes(action)){const t=s.tasks.find(t=>t.id===p.id&&!t.deletedAt);requireCondition(t,'任务不存在或已删除');
+if(action==='deleteTask'){owner();t.deletedAt=now;message='任务已删除，已结算的积分和历史成就保留';}
 if(action==='accept'){partner();requireCondition(t.status==='pending','任务状态已改变，请刷新');t.status='active';message='收到！开始完成任务吧';}
 if(action==='decline'){partner();requireCondition(t.status==='pending','只能拒绝未接受的任务');t.status='declined';t.feedback=txt(p.note,500)||'暂时无法接受这个任务';message='已告知发布者';}
 if(action==='cancel'){owner();requireCondition(['pending','active','revision'].includes(t.status),'当前状态不能取消任务');t.status='cancelled';message='任务已取消';}

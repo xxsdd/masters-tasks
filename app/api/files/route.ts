@@ -1,10 +1,11 @@
 import {getUser,sameOrigin} from '@/app/auth';
 import {database,roomFor} from '@/db/store';
 import {put,get,del} from '@vercel/blob';
+import {boardFor} from '@/app/boards';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function POST(req:Request){try{
  if(!sameOrigin(req))return new Response('Forbidden',{status:403});const u=await getUser();if(!u)return Response.json({error:'请先登录'},{status:401});
- const room=await roomFor(u.userId);if(!room||room.partner!==u.userId)return Response.json({error:'只有接任务的人可以上传凭证'},{status:403});
+ const room=await roomFor(u.userId);if(!room||boardFor(room,u.userId).role!=='partner')return Response.json({error:'请切换到接任务身份后上传凭证'},{status:403});
  if(Number(req.headers.get('content-length'))>4300000)return Response.json({error:'文件不能超过 4MB'},{status:413});
  const form=await req.formData(),file=form.get('file');if(!(file instanceof File)||file.size>4*1024*1024||file.size===0)return Response.json({error:'请选择 4MB 以内的文件'},{status:400});
  const type=file.type;if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(type))return Response.json({error:'支持 JPG、PNG、WebP 和 PDF 文件'},{status:400});
