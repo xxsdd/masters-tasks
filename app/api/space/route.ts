@@ -5,7 +5,7 @@ import {boardFor} from '@/app/boards';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 class PublicError extends Error{}
-export async function GET(){try{const user=await getUser();if(!user)return reply({user:null,room:null});const room=await roomFor(user.userId);const board=room?boardFor(room,user.userId):null;return reply({user:{id:user.userId,name:user.displayName,username:user.username,email:user.email,emailVerified:user.emailVerified},room:room&&board?{id:room.id,role:board.role,board:board.column,paired:!!room.partner,code:room.owner===user.userId?room.code:null,state:board.state}:null});}catch(e:any){console.error('space load',e.code||e.name);return reply({error:'暂时无法加载空间，请稍后重试'},503)}}
+export async function GET(){try{const user=await getUser();if(!user)return reply({user:null,room:null});const room=await roomFor(user.userId);const board=room?boardFor(room,user.userId):null;return reply({user:{id:user.userId,name:user.displayName,username:user.username},room:room&&board?{id:room.id,role:board.role,board:board.column,paired:!!room.partner,code:room.owner===user.userId?room.code:null,state:board.state}:null});}catch(e:any){console.error('space load',e.code||e.name);return reply({error:'暂时无法加载空间，请稍后重试'},503)}}
 export async function POST(req:Request){
  if(!sameOrigin(req))return reply({error:'请求来源无效'},403);
  try{

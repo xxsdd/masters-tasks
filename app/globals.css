@@ -14,7 +14,6 @@
 .account-panel{max-width:640px;margin:24px auto}.account-panel h2{display:flex;align-items:center;gap:9px}
 .account-panel>p{margin:12px 0}.account-panel .notice{margin:16px 0}
 .auth-links{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}.auth-links .link-button{min-height:44px}
-.otp-input{letter-spacing:.25em;font-size:22px!important;font-variant-numeric:tabular-nums}
 .notice,.history-row p,.probability h3,.panel-title h2{overflow-wrap:anywhere}
 .form>*,.form-columns>*{min-width:0}.form input,.form textarea{font-size:16px;min-height:44px}
 .task-item{position:relative}.task-delete{display:flex;margin:5px 0 0 auto;min-height:44px;padding:6px 12px;color:#b52e48}
